@@ -1,0 +1,12 @@
+# verbose level 0=info, 1=verbose, 2=very verbose
+verbose: 0
+listen:
+  # dropbear
+  - target_host: 127.0.0.1
+    target_port: 222
+    listen_port: 80
+
+  # openssh
+  - target_host: 127.0.0.1
+    target_port: 22
+    listen_port: 88
