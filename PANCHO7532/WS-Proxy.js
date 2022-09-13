@@ -6,12 +6,14 @@
 const net = require('net');
 const stream = require('stream');
 const util = require('util');
+
 var dhost = "127.0.0.1";
 var dport = "8080";
 var mainPort = "8888";
 var outputFile = "outputFile.txt";
 var packetsToSkip = 0;
 var gcwarn = true;
+
 for(c = 0; c < process.argv.length; c++) {
     switch(process.argv[c]) {
         case "-skip":
@@ -43,6 +45,7 @@ function gcollector() {
         return;
     }
 }
+
 function parseRemoteAddr(raddr) {
     if(raddr.toString().indexOf("ffff") != -1) {
         //is IPV4 address
@@ -51,31 +54,36 @@ function parseRemoteAddr(raddr) {
         return raddr;
     }
 }
+
 setInterval(gcollector, 1000);
+
 const server = net.createServer();
+
 server.on('connection', function(socket) {
     var packetCount = 0;
-    //var handshakeMade = false;
-    socket.write("HTTP/1.1 101 Switching Protocols\r\nContent-Length: 1048576000000\r\n\r\n");
+    var handshakeMade = false;
+
     console.log("[INFO] - Connection received from " + socket.remoteAddress + ":" + socket.remotePort);
+
     var conn = net.createConnection({host: dhost, port: dport});
+
     socket.on('data', function(data) {
-        //pipe sucks
-        if(packetCount < packetsToSkip) {
-            //console.log("---c1");
-            packetCount++;
-        } else if(packetCount == packetsToSkip) {
-            //console.log("---c2");
-            conn.write(data);
+        if (!handshakeMade)
+        {
+            // Skip the HTTP connection upgrade to websocket.
+            handshakeMade = true;
+            socket.write("HTTP/1.1 101 Switching Protocols (Nodejs)\r\nContent-Length: 1048576000000\r\n\r\n");
+            console.log("[INFO] - Handshake is made with HTTP, now everything will be forwarded to destination!")
+            return null
         }
-        if(packetCount > packetsToSkip) {
-            //console.log("---c3");
-            packetCount = packetsToSkip;
-        }
-        //conn.write(data);
+
+        // Forward everything to destination
+        conn.write(data);
     });
+
     conn.on('data', function(data) {
         //pipe sucks x2
+        // Forward everything to client
         socket.write(data);
     });
     socket.once('data', function(data) {
@@ -96,6 +104,7 @@ server.on('connection', function(socket) {
         conn.destroy();
     });
 });
+
 server.listen(mainPort, function(){
     console.log("[INFO] - Server started on port: " + mainPort);
     console.log("[INFO] - Redirecting requests to: " + dhost + " at port " + dport);
